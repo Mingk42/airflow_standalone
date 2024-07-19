@@ -1,0 +1,7 @@
+logs/
+__pycache__
+
+standalone_admin_password.txt
+airflow.db
+*.pid
+*.swp
