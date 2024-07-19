@@ -4,7 +4,6 @@ from textwrap import dedent
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 with DAG(
     'import_db',
@@ -56,18 +55,45 @@ with DAG(
         """
     )
 
-    task_to_tmp = SQLExecuteQueryOperator(
+    task_to_tmp = BashOperator(
             task_id="to.tmp",
-            sql="""
-                show databases;
-            """,
-            conn_id='root'
-    )
+            bash_command="""
+                echo "to.tmp"
+                CSV_PATH=~/data/csv/{{logical_date.strftime('%y%m%d')}}/count.csv
 
+                mysql -u root -p{{var.value.DB_PASSWD}} -e "CREATE DATABASE IF NOT EXISTS history_db;"
+
+                mysql -u root -p{{var.value.DB_PASSWD}} <<QUERY
+                    CREATE TABLE IF NOT EXISTS history_db.tmp_cmd_usage(
+                        dt VARCHAR(20),
+                        command VARCHAR(500),
+                        cnt VARCHAR(500)
+                    );
+                QUERY
+
+                mysql -u root -p{{var.value.DB_PASSWD}} <<QUERY
+                    LOAD DATA INFILE $CSV_PATH
+                    INTO TABLE tmp_cmd_usage
+                    FIELDS TERMINATED BY ','
+                    LINES TERMINATED BY '\n';
+                QUERY
+            """
+    )
     task_to_base = BashOperator(
             task_id="to.base",
             bash_command = """
                 echo "to.base"
+
+                mysql -u root -p{{var.value.DB_PASSWD}} <<EOF
+                CREATE TABLE IF NOT EXISTS history_db.cmd_usage(
+                    dt DATE,
+                    command VARCHAR(500),
+                    cnt INT
+                );
+
+
+
+                EOF
             """,
             trigger_rule="all_success"
     )
