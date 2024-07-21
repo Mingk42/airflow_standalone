@@ -59,24 +59,29 @@ with DAG(
             task_id="to.tmp",
             bash_command="""
                 echo "to.tmp"
-                CSV_PATH=~/data/csv/{{logical_date.strftime('%y%m%d')}}/count.csv
+                CSV_PATH=/home/root2/data/csv/{{logical_date.strftime('%y%m%d')}}/count.csv
+                SECU_PATH=/var/lib/mysql-files
+
+                sudo cp  $CSV_PATH $SECU_PATH/count.csv 
 
                 mysql -u root -p{{var.value.DB_PASSWD}} -e "CREATE DATABASE IF NOT EXISTS history_db;"
 
-                mysql -u root -p{{var.value.DB_PASSWD}} <<QUERY
-                    CREATE TABLE IF NOT EXISTS history_db.tmp_cmd_usage(
+                mysql -u root -p{{var.value.DB_PASSWD}} -e "DELETE FROM history_db.tmp_cmd_usage WHERE dt={{ds}};"
+
+                mysql -u root -p{{var.value.DB_PASSWD}} history_db <<QUERY
+                    CREATE TABLE IF NOT EXISTS tmp_cmd_usage(
                         dt VARCHAR(20),
                         command VARCHAR(500),
                         cnt VARCHAR(500)
-                    );
-                QUERY
+                    )
+QUERY
 
-                mysql -u root -p{{var.value.DB_PASSWD}} <<QUERY
-                    LOAD DATA INFILE $CSV_PATH
+                mysql -u root -p{{var.value.DB_PASSWD}} history_db <<QUERY
+                    LOAD DATA INFILE '$SECU_PATH/count.csv'
                     INTO TABLE tmp_cmd_usage
                     FIELDS TERMINATED BY ','
-                    LINES TERMINATED BY '\n';
-                QUERY
+                    LINES TERMINATED BY '\\n'
+QUERY
             """
     )
     task_to_base = BashOperator(
