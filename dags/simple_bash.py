@@ -20,7 +20,7 @@ with DAG(
     },
     description='hello world DAG',
 #    schedule_interval=timedelta(days=1),              deprecated
-    schedule = "10 4 * * *",
+    schedule = "10 3 * * *",
     start_date=datetime(2024, 7, 10),
     catchup=True,
     tags=['simple', 'bash', 'etl', 'shop'],
@@ -46,8 +46,8 @@ with DAG(
     task_copy = BashOperator(
         task_id = "copy.log",
         bash_command = """
-            mkdir -p ~/data/{{logical_date.strftime('%y%m%d')}}
-            cp ~/log/history_{{logical_date.strftime('%y%m%d')}}*.log ~/data/{{logical_date.strftime('%y%m%d')}}
+            mkdir -p ~/data/{{ds_nodash}}
+            cp ~/log/history_{{logical_date.strftime('%y%m%d')}}*.log ~/data/{{ds_nodash}}
         """
     )
 
@@ -55,8 +55,8 @@ with DAG(
             task_id="sort.log",
             bash_command="""
                 echo "sort"
-                 mkdir -p ~/data/sort/{{logical_date.strftime('%y%m%d')}}
-                 cat  ~/data/cut/{{logical_date.strftime('%y%m%d')}}/cut.log | sort > ~/data/sort/{{logical_date.strftime('%y%m%d')}}/sort.log
+                 mkdir -p ~/data/sort/{{ds_nodash}}
+                 cat  ~/data/cut/{{ds_nodash}}/cut.log | sort > ~/data/sort/{{ds_nodash}}/sort.log
             """
     )
 
@@ -64,8 +64,8 @@ with DAG(
             task_id="cut.log",
             bash_command = """
                 echo "cut"
-                mkdir -p ~/data/cut/{{logical_date.strftime('%y%m%d')}}
-                cat ~/data/{{logical_date.strftime('%y%m%d')}}/* | cut -d' ' -f1 > ~/data/cut/{{logical_date.strftime('%y%m%d')}}/cut.log
+                mkdir -p ~/data/cut/{{ds_nodash}}
+                cat ~/data/{{ds_nodash}}/* | cut -d' ' -f1 > ~/data/cut/{{ds_nodash}}/cut.log
             """,
             trigger_rule="all_success"
     )
@@ -74,9 +74,8 @@ with DAG(
             task_id="count.log",
             bash_command="""
                 echo "count"
-                mkdir -p ~/data/count/{{logical_date.strftime('%y%m%d')}}
-                cat  ~/data/sort/{{logical_date.strftime('%y%m%d')}}/sort.log | uniq -c >  ~/data/count/{{logical_date.strftime('%y%m%d')}}/count.log
-                cat  ~/data/count/{{logical_date.strftime('%y%m%d')}}/count.log
+                mkdir -p ~/data/count/{{ds_nodash}}
+                cat  ~/data/sort/{{ds_nodash}}/sort.log | uniq -c >  ~/data/count/{{ds_nodash}}/count.log
             """
     )
 
@@ -92,8 +91,10 @@ with DAG(
             task_id="make.done",
             bash_command="""
                 echo "make done"
-                mkdir -p ~/data/done/{{logical_date.strftime('%y%m%d')}}
-                touch ~/data/done/{{logical_date.strftime('%y%m%d')}}/_DONE
+                DONE_PATH={{var.value.DONE_PATH}}/{{ds_nodash}}
+
+                mkdir -p $DONE_PATH
+                touch $DONE_PATH/_DONE
             """
     )
 

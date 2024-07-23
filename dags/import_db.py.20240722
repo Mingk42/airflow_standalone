@@ -12,7 +12,7 @@ with DAG(
         'retries': 1,
         'retry_delay': timedelta(seconds=3)
     },
-    description='import DB from csv',
+    description='hello world DAG',
     schedule = "10 4 * * *",
     start_date=datetime(2024, 7, 10),
     catchup=True,
@@ -24,8 +24,20 @@ with DAG(
     task_check = BashOperator(
         task_id='check.done',
         bash_command="""
-            DONE_PATH={{var.value.DONE_PATH}}/{{ds_nodash}}
-            bash {{var.value.CHECK_SH}} $DONE_PATH
+#            ~/airflow/dags/check.done.sh {{logical_date.strftime('%y%m%d')}}
+            bash {{var.value.CHECK_SH}} {{logical_date.strftime('%y%m%d')}}
+#            echo "check.done"
+#            DONE_PATH=~/data/done/{{logical_date.strftime('%y%m%d')}}
+#            DONE_PATH_FILE="$DONE_PATH/_DONE"
+#            echo $DONE_PATH_FILE
+
+#            if [ -e "$DONE_PATH_FILE" ]; then
+#                figlet "Let's move on!"
+#                exit 0
+#            else
+#                echo "I'll be back => $DONE_PATH_FILE"
+#                exit 1
+#            fi
         """
     )
 
@@ -33,10 +45,13 @@ with DAG(
         task_id = "to.csv",
         bash_command = """
             echo "to.csv"
-            COUNT_PATH=~/data/count/{{ds_nodash}}/count.log
-            CSV_PATH=~/data/csv/{{ds_nodash}}
+            COUNT_PATH=~/data/count/{{logical_date.strftime('%y%m%d')}}/count.log
+            CSV_PATH=~/data/csv/{{logical_date.strftime('%y%m%d')}}
 
             mkdir -p $CSV_PATH
+#            cat  ${COUNT_PATH} | awk '{print "{{ds}},"$2","$1}' > ${CSV_PATH}/count.csv
+#            cat  ${COUNT_PATH} | awk '{print "\\"{{ds}}\\",\\"" $2 "\\",\\"" $1 "\\""}' > ${CSV_PATH}/count.csv
+#            cat  ${COUNT_PATH} | awk '{print "#{{ds}}#,#" $2 "#,#" $1 "#"}' > ${CSV_PATH}/count.csv
             cat  ${COUNT_PATH} | head -n -5  | awk '{print "^{{ds}}^,^" $2 "^,^" $1 "^"}' > ${CSV_PATH}/count.csv
 
             echo $CSV_PATH
@@ -55,11 +70,16 @@ with DAG(
             task_id="to.tmp",
             bash_command="""
                 echo "to.tmp"
-                CSV_PATH=/home/root2/data/csv/{{ds_nodash}}/count.csv
+                CSV_PATH=/home/root2/data/csv/{{logical_date.strftime('%y%m%d')}}/count.csv
+                SECU_PATH=/var/lib/mysql-files
+
+                # echo 'root' | sudo -S cp $CSV_PATH $SECU_PATH/count_{{ds_nodash}}.csv
 
                 MYSQL_PWD={{var.value.DB_PASSWD}} mysql -u root -e "DELETE FROM history_db.tmp_cmd_usage WHERE dt='{{ds}}';"
 
                 MYSQL_PWD={{var.value.DB_PASSWD}} mysql --local-infile=1 -u root history_db <<QUERY
+--                    LOAD DATA INFILE '$SECU_PATH/count_{{ds_nodash}}.csv'
+--                    LOAD DATA INFILE '$SECU_PATH/count_20240712.csv'
                     LOAD DATA LOCAL INFILE '$CSV_PATH'
                     INTO TABLE tmp_cmd_usage
                     CHARACTER SET euckr
@@ -82,13 +102,21 @@ QUERY
                     INSERT INTO cmd_usage 
                     SELECT 
                     	CASE WHEN dt LIKE '%-%-%' THEN STR_TO_DATE(dt, '%Y-%m-%d') 
-                    	ELSE STR_TO_DATE('1970-01-01', '%Y-%m-%d') END dt,
+                    	ELSE STR_TO_DATE('1970-01-01', '%Y-%m-%d')  END dt,
                     	command,
                     	CASE WHEN cnt REGEXP '[0-9]+$' THEN CAST(cnt AS UNSIGNED)
-                    	ELSE -1 END cnt,
-                        '{{ds}}' tmp_dt
+                    	ELSE -1 END cnt
                     FROM tmp_cmd_usage
                     WHERE dt='{{ds}}';
+
+#                INSERT INTO cmd_usage 
+#                    SELECT 
+#                    	COALESCE(STR_TO_DATE(dt,'%Y-%m-%d'), STR_TO_DATE('1970-01-01','%Y-%m-%d')) dt,
+#                    	command,
+#                    	CAST(cnt as unsigned) cnt 
+#                    FROM tmp_cmd_usage
+#                   WHERE dt={{ds}}
+#                ;
 EOF
             """,
             trigger_rule="all_success"
@@ -98,10 +126,6 @@ EOF
             task_id="make.done",
             bash_command="""
                 echo "make done"
-                DONE_PATH={{ var.value.IMPORT_DONE_PATH  }}/{{ds_nodash}}
-
-                mkdir -p $DONE_PATH
-                touch $DONE_PATH/_DONE
             """
     )
 

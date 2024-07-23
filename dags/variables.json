@@ -1,0 +1,5 @@
+{
+    "CHECK_SH": "/home/root2/airflow/dags/check.done.sh",
+    "DB_PASSWD": "root",
+    "MY_NAME": "Mingk42"
+}
