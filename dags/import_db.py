@@ -13,7 +13,7 @@ with DAG(
         'retry_delay': timedelta(seconds=3)
     },
     description='import DB from csv',
-    schedule = "10 4 * * *",
+    schedule = "10 1 * * *",
     start_date=datetime(2024, 7, 10),
     catchup=True,
     tags=['import', 'db', 'etl', 'shop'],

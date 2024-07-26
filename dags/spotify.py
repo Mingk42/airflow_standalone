@@ -13,7 +13,7 @@ with DAG(
     # These args will get passed on to each operator
     # You can override them on a per-task basis during operator initialization
     default_args={
-        'depends_on_past': True,
+        'depends_on_past': False,
         'email_on_failure': False,
         'email_on_retry': False,
         'retries': 1,
@@ -68,10 +68,19 @@ with DAG(
     t8 = DummyOperator(task_id='SearchRst')
     t9 = DummyOperator(task_id='AnalysisLike')
 
+    task_err=BashOperator(
+            task_id="err.report",
+            bash_command="""
+                echo "error"
+            """,
+            trigger_rule="one_failed"
+    )
+
     task_start = DummyOperator(task_id='start')
-    task_end = DummyOperator(task_id='end')
+    task_end = DummyOperator(task_id='end', trigger_rule="all_done")
    
     t1 >> t2 >> t3 >> [t4 ,t5, t6, t7] >> t8
     [t4, t7] >> t9
     [t8, t9] >> task_end
     task_start >> t1
+    [t4 ,t5, t6, t7] >> task_err >> task_end
