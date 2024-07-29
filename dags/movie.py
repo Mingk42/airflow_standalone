@@ -5,7 +5,7 @@ from pprint import pprint
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
+from airflow.operators.python import PythonOperator, PythonVirtualenvOperator
 
 
 with DAG(
@@ -15,9 +15,9 @@ with DAG(
         'retries': 1,
         'retry_delay': timedelta(seconds=3)
     },
-    description='import DB from csv',
+    description='movie api import',
     schedule = "10 4 * * *",
-    start_date=datetime(2024, 7, 10),
+    start_date=datetime(2024, 7, 20),
     catchup=True,
     tags=['movie', 'etl', 'shop'],
 ) as dag:
@@ -33,8 +33,7 @@ with DAG(
         print("::endgroup::")
         return "Whatever you return gets printed in the logs"
 
-    run_this = PythonOperator(task_id="print_the_context", python_callable=print_context)
-
+#    run_this = PythonOperator(task_id="print_the_context", python_callable=print_context)
 
     def get_data(ds, **kwargs):
         print(ds)
@@ -51,9 +50,16 @@ with DAG(
         df=save2df(yyyymmdd)
         print(df)
 
-    task_get_data = PythonOperator(
-        task_id='get.data',
-        python_callable=get_data
+    #task_get_data = PythonOperator(
+    #    task_id='get.data',
+    #    python_callable=get_data
+    #)
+    
+    task_get_data = PythonVirtualenvOperator(
+        task_id="get.data",
+        python_callable=get_data,
+        requirements=["git+https://github.com/Mingk42/-Mingk42-movie.git@v0.2.1/api"],
+        system_site_packages=False,
     )
 
     task_save_data = BashOperator(
@@ -111,4 +117,4 @@ with DAG(
 
     #task_get_data >> task_err >> task_end    # fail flow
     task_get_data >> task_save_data >> [task_middle1, task_middle2, task_middle3, task_middle4] >> task_end   # success flow
-    task_start >> run_this >> task_end
+    #task_start >> virtualenv_task >> task_end
