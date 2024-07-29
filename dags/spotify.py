@@ -1,12 +1,11 @@
 from datetime import datetime, timedelta
 from textwrap import dedent
 
-# The DAG object; we'll need this to instantiate a DAG
 from airflow import DAG
-
-# Operators; we need this to operate!
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
+
+import requests as reqs
 
 with DAG(
     'spotify',
@@ -17,7 +16,7 @@ with DAG(
         'email_on_failure': False,
         'email_on_retry': False,
         'retries': 1,
-        'retry_delay': timedelta(minutes=5)
+        'retry_delay': timedelta(seconds=10)
     },
     description='spotify search result analysis DAG',
     schedule_interval=timedelta(days=1),
@@ -34,16 +33,17 @@ with DAG(
 
     t2 = BashOperator(
         task_id='getSessionKey',
-        depends_on_past=False,
-        bash_command='curl -X POST "https://accounts.spotify.com/api/token" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "grant_type=client_credentials&client_id=XXXXXX&client_secret=XXXXXX"',
-        retries=3,
+        bash_command="""
+        'curl -X POST "https://accounts.spotify.com/api/token" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -d "grant_type=client_credentials&client_id=XXXXXX&client_secret=XXXXXX"' 
+         """
     )
 
     t3 = BashOperator(
             task_id='getData',
             bash_command="""
+            cat ~/tmp/tmp.keyfile
                 curl "https://api.spotify.com/v1/artists/XXXXXX" -H "Authorization: Bearer  SessionKey" > ~/tmp/data.json
             """
      )

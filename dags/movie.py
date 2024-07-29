@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta
 from textwrap import dedent
+from pprint import pprint
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
+
 
 with DAG(
     'movie',
@@ -20,13 +23,34 @@ with DAG(
 ) as dag:
 
 
+    def print_context(ds=None, **kwargs):
+        """Print the Airflow context and ds variable from the context."""
+        print("::group::All kwargs")
+        pprint(kwargs)
+        print("::endgroup::")
+        print("::group::Context variable ds")
+        print(ds)
+        print("::endgroup::")
+        return "Whatever you return gets printed in the logs"
 
-    task_get_data = BashOperator(
+    run_this = PythonOperator(task_id="print_the_context", python_callable=print_context)
+
+
+    def get_data(ds, **kwargs):
+        print(ds)
+        print(kwargs)
+        print("="*20)
+        print(f"ds_nodash =>>> {kwargs['ds_nodash']}")
+        print(f"kwargs_type =>>> {type(kwargs)}")
+        print("="*20)
+
+        from movie.api.call import get_key
+        key=get_key()
+        print(f"movie_api_key ::::: {key}")
+
+    task_get_data = PythonOperator(
         task_id='get.data',
-        bash_command="""
-            echo "get.data.start"
-            echo "get.data.end"
-        """
+        python_callable=get_data
     )
 
     task_save_data = BashOperator(
@@ -84,3 +108,4 @@ with DAG(
 
     #task_get_data >> task_err >> task_end    # fail flow
     task_get_data >> task_save_data >> [task_middle1, task_middle2, task_middle3, task_middle4] >> task_end   # success flow
+    task_start >> run_this >> task_end
