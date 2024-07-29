@@ -44,9 +44,12 @@ with DAG(
         print(f"kwargs_type =>>> {type(kwargs)}")
         print("="*20)
 
-        from movie.api.call import get_key
+        from movie.api.call import get_key,save2df
         key=get_key()
         print(f"movie_api_key ::::: {key}")
+        yyyymmdd=kwargs["ds_nodash"]
+        df=save2df(yyyymmdd)
+        print(df)
 
     task_get_data = PythonOperator(
         task_id='get.data',
