@@ -13,11 +13,13 @@ with DAG(
     default_args={
         'depends_on_past': False,
         'retries': 1,
-        'retry_delay': timedelta(seconds=3)
+        'retry_delay': timedelta(seconds=3),
     },
+    # max_active_runs:1           #  여러 날짜를 몇 개나 병렬로 처리
+    # max_active_tasks:3,         #  1개 날짜에 대해 병렬처리를 몇 개 지원
     description='movie api import',
     schedule = "10 4 * * *",
-    start_date=datetime(2024, 7, 10),
+    start_date=datetime(2024, 7, 20),
     catchup=True,
     tags=['movie', 'etl', 'shop'],
 ) as dag:
@@ -48,13 +50,6 @@ with DAG(
         # df=save2df(yyyymmdd)
         df=save2df(ds_nodash)
         print(df)
-
-        if ds_nodash=="20240724":
-            print("deadpool")
-            return "save.data"
-        else:
-            print("aaaaaaa")
-            return "end"
 
     #task_get_data = PythonOperator(
     #    task_id='get.data',
@@ -162,6 +157,12 @@ with DAG(
 
     task_end = EmptyOperator(task_id='end', trigger_rule='all_done')
     task_start = EmptyOperator(task_id='start')
+
+    multi_y = EmptyOperator(task_id='multi.y') # 다양성 영화 여부
+    multi_n = EmptyOperator(task_id='multi.n') # 다양성 영화 여부
+    nation_k = EmptyOperator(task_id='nation.k') # 국산영화 여부
+    nation_f = EmptyOperator(task_id='nation.f') # 국산영화 여부
+
     task_join = BashOperator(
             task_id='join',
             bash_command="""
@@ -170,13 +171,16 @@ with DAG(
             trigger_rule="all_done"
     )
 
-
     task_start >> branch_op >> [task_get_data, task_rm_dir]
     branch_op >> task_echo #>> task_save_data
     #task_get_data >> task_err >> task_end    # fail flow
     task_rm_dir >> task_get_data
     task_get_data >> task_save_data >> task_end   # success flow
     #task_start >> virtualenv_task >> task_end               [task_middle2, task_middle3, task_middle4] >>
+
+    task_rm_dir >> [multi_y,multi_n,nation_k,nation_f]
+    branch_op >> [multi_y,multi_n,nation_k,nation_f]
+    [multi_y,multi_n,nation_k,nation_f] >> task_save_data
 
 
     task_start >> task_join >> task_save_data
