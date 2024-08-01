@@ -115,7 +115,7 @@ with DAG(
         for k,v in url_param.items():
             df[k]=v
         
-        df["load_dt"]=ds_nodash
+        print(df)
 
         p_cols = ["load_dt"] + list(url_param.keys())
         # p_cols = list(url_param.keys()).insert(0,"load_dt")
