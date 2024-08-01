@@ -50,7 +50,7 @@ with DAG(
         print(params)
         if "task_name" in params:
             print("----------------Y")
-        else:kwargs["op_kwargs"]
+        else:
             print("----------------N")
         print("*"*30)
     
