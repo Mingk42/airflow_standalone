@@ -88,7 +88,7 @@ with DAG(
             python_callable=branch_func
     )
 
-    def save_data(ds_nodash):
+    def apply_type2df(ds_nodash):
         from movie.api.call import apply_type2df
 
         df=apply_type2df(load_dt=ds_nodash)
@@ -103,29 +103,48 @@ with DAG(
         print("===개봉일별 영화 관객수 합계===")
         print(sum_df)
 
+    def save_data(ds_nodash):
+        from movie.api.call import list2df
+        df=list2df(ds_nodash,
+        df.to_parquet("~/tmp/test_parquet/",partition_cols=['load_dt'])
+        return 0
 
-    def common_get_data(ds_nodash,url_param):
+    """
+    def func_multi_y(ds_nodash):
+        from movie.api.call import save2df
+        p={"multiMovieYn":"Y"}
+        df = save2df(dt=ds_nodash, url_param=p)
+        print(df)
+
+    def func_multi_n(ds_nodash):
+        from movie.api.call import save2df
+        p={"multiMovieYn":"N"}
+        df = save2df(dt=ds_nodash, url_param=p)
+        print(df)
+
+    def func_nation_k(ds_nodash):
+        from movie.api.call import save2df
+        p={"repNationCd":"K"}
+        df = save2df(dt=ds_nodash, url_param=p)
+        print(df)
+
+    def func_nation_f(ds_nodash):
+        from movie.api.call import save2df
+        p={"repNationCd":"F"}
+        df = save2df(dt=ds_nodash, url_param=p)
+        print(df)
+    """
+    def common_get_data(ds_nodash,**kwargs):
         from movie.api.call import save2df
         
+        url_param={}
+        for k, v in kwargs.items():
+            if k=="multiMovieYn" or k=="repNationCd":
+                url_param[k]=v
+
+        # df = save2df(dt=ds_nodash, url_param={"multiMovieYn":kwargs["multiMovieYn"], "repNationCd":kwargs["repNationCd"]})
         df = save2df(dt=ds_nodash, url_param=url_param)
-        print("-----------------")
         print(df)
-        print("-----------------")
-        
-        for k,v in url_param.items():
-            df[k]=v
-        
-        df["load_dt"]=ds_nodash
-
-        p_cols = ["load_dt"] + list(url_param.keys())
-        # p_cols = list(url_param.keys()).insert(0,"load_dt")
-        print("url param:::::::::",url_param,list(url_param.keys()))
-        print("pcol:::::::::",p_cols)
-
-        df.to_parquet("/home/root2/tmp/test_parquet/",
-                      # partition_cols=['load_dt']
-                      partition_cols=p_cols
-                      )
 
     task_save_data = PythonVirtualenvOperator(
         task_id="save.data",
@@ -133,37 +152,35 @@ with DAG(
         requirements=["git+https://github.com/Mingk42/-Mingk42-movie.git@v0.2.5/api_test"],
         system_site_packages=False,
         trigger_rule="none_skipped",
+        # venv_cache_path="/home/root2/tmp/airflow_venv/get_data"
     )
 
     multi_y = PythonVirtualenvOperator(     # 다양성 영화 여부
             task_id='multi.y',
+            # python_callable=func_multi_y,
             python_callable=common_get_data,
-            # op_kwargs={"multiMovieYn":"Y"},
-            op_kwargs={"url_param":{"multiMovieYn":"Y"}},
+            op_kwargs={"multiMovieYn":"Y"},
             requirements=["git+https://github.com/Mingk42/-Mingk42-movie.git@v0.2.5/api_test"],
             system_site_packages=False,
     )
     multi_n = PythonVirtualenvOperator(     # 다양성 영화 여부
             task_id='multi.n',
             python_callable=common_get_data,
-            # op_kwargs={"multiMovieYn":"N"},
-            op_kwargs={"url_param":{"multiMovieYn":"N"}},
+            op_kwargs={"multiMovieYn":"N"},
             requirements=["git+https://github.com/Mingk42/-Mingk42-movie.git@v0.2.5/api_test"],
             system_site_packages=False,
     )
     nation_k = PythonVirtualenvOperator(     # 국산영화 여부
             task_id='nation.k',
             python_callable=common_get_data,
-            # op_kwargs={"repNationCd":"K"},
-            op_kwargs={"url_param":{"repNationCd":"K"}},
+            op_kwargs={"repNationCd":"K"},
             requirements=["git+https://github.com/Mingk42/-Mingk42-movie.git@v0.2.5/api_test"],
             system_site_packages=False,
     )
     nation_f = PythonVirtualenvOperator(     # 국산영화 여부
             task_id='nation.f',
             python_callable=common_get_data,
-            # op_kwargs={"repNationCd":"F"},
-            op_kwargs={"url_param":{"repNationCd":"F"}},
+            op_kwargs={"repNationCd":"F"},
             requirements=["git+https://github.com/Mingk42/-Mingk42-movie.git@v0.2.5/api_test"],
             system_site_packages=False,
     )
@@ -183,6 +200,14 @@ with DAG(
                 echo "echo.start"
                 echo "echo.end"
             """
+    )
+
+    task_err = BashOperator(
+            task_id="err.report",
+            bash_command="""
+              echo "err report"  
+            """,
+            trigger_rule="one_failed"
     )
 
     task_end = EmptyOperator(task_id='end', trigger_rule='all_done')
@@ -212,6 +237,6 @@ with DAG(
     branch_op >> task_rm_dir >> task_get_start
     branch_op >> task_echo 
     branch_op >> task_get_start
-    task_get_start >> [multi_y, multi_n, nation_k, nation_f,] >> task_get_end
+    task_get_start >> [multi_y, multi_n, nation_k, nation_f, task_get_data] >> task_get_end
 
     task_get_end >> task_save_data >> task_end
