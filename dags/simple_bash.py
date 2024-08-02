@@ -20,7 +20,7 @@ with DAG(
     },
     description='hello world DAG',
 #    schedule_interval=timedelta(days=1),              deprecated
-    schedule = "10 3 * * *",
+    schedule = "10 0 * * *",
     start_date=datetime(2024, 7, 10),
     catchup=True,
     tags=['simple', 'bash', 'etl', 'shop'],
